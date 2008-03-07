@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesource.org/schema/mule/core/2.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:spring="http://www.springframework.org/schema/beans"
+      xmlns:vm="http://www.mulesource.org/schema/mule/vm/2.0"
+      xmlns:file="http://www.mulesource.org/schema/mule/file/2.0"
+      xmlns:stdio="http://www.mulesource.org/schema/mule/stdio/2.0"
+      xmlns:tcp="http://www.mulesource.org/schema/mule/tcp/2.0"
+      xsi:schemaLocation="
+               http://www.mulesource.org/schema/mule/core/2.0 http://www.mulesource.org/schema/mule/core/2.0/mule.xsd
+               http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.0.xsd
+               http://www.mulesource.org/schema/mule/vm/2.0 http://www.mulesource.org/schema/mule/vm/2.0/mule-vm.xsd
+               http://www.mulesource.org/schema/mule/file/2.0 http://www.mulesource.org/schema/mule/file/2.0/mule-file.xsd
+               http://www.mulesource.org/schema/mule/stdio/2.0 http://www.mulesource.org/schema/mule/stdio/2.0/mule-stdio.xsd
+               http://www.mulesource.org/schema/mule/tcp/2.0 http://www.mulesource.org/schema/mule/tcp/2.0/mule-tcp.xsd">
+
+    <spring:beans>
+
+        <spring:import resource="classpath:components-spring.xml"/>
+
+        <spring:bean id="propertyConfigurer"
+                     class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+            <spring:property name="location" value="classpath:mule-config-spring.properties"/>
+        </spring:bean>
+
+    </spring:beans>
+
+    <description>
+        This is the Mule configuration file for a skeleton project generated using the maven-mule-archetype. As a
+        convention all integration, or "plumbing", is handled by this file whereas services are loaded in a separate
+        Spring-configuration file called "components-spring.xml". An example applications, consisting of two trivial
+        UMO's, has been generated in order to introduce basic configuration elements in this configuration file.
+    </description>
+
+    <!-- ***** Connectors: ***************************************************************************************** -->
+    <!-- *****                                                                                                     * -->
+    <!-- *****  - stdioConnector: Prompts the user to enter his/hers name on the console (System.in)               * -->
+    <!-- *****                                                                                                     * -->
+    <!-- ***** Connectors for other transports used in this example, like vm:// and file:// is implicitly          * -->
+    <!-- ***** configured by default values.                                                                       * -->
+    <!-- *********************************************************************************************************** -->
+    <stdio:connector name="stdioConnector" promptMessage="Please enter your name: " messageDelayTime="1000"/>
+
+    <!-- ***** Transformers: *************************************************************************************** -->
+    <!-- *****                                                                                                     * -->
+    <!-- *****  - File2String:        Converts a java.io.File reference into a String. i.e. the content of the     * -->
+    <!-- *****                        file is converted into a String.                                             * -->
+    <!-- *****  - ByteArray2String:   Converts a byte [] into a String.                                            * -->
+    <!-- *****  - ErrorPrefix:        Converts a string into 'ERROR: <original-string>'                            * -->
+    <!-- *****  - RejectedPrefix:     Converts a string into 'REJECTED: <original-string>'                         * -->
+    <!-- *********************************************************************************************************** -->
+    <file:file-to-string-transformer name="File2String"/>
+    <byte-array-to-string-transformer name="ByteArray2String"/>
+    <custom-transformer name="ErrorPrefix" class="${groupId}.transformers.PrefixStringTransformer">
+        <spring:property name="prefix" value="ERROR"/>
+    </custom-transformer>
+    <custom-transformer name="RejectedPrefix" class="${groupId}.transformers.PrefixStringTransformer">
+        <spring:property name="prefix" value="REJECTED"/>
+    </custom-transformer>
+
+    <!-- ***** (Global) Endpoints: ********************************************************************************* -->
+    <!-- *****                                                                                                     * -->
+    <!-- *****  - Entry:        Main entrypoint into the system, which is System.in                                * -->
+    <!-- *****  - Exit:         Main exit, though System.out                                                       * -->
+    <!-- *****  - Error:        Endpoint for all exceptions, errors and rejected messages. In this case System.err * -->
+    <!-- *****                                                                                                     * -->
+    <!-- *****  - Capitalize.In     Main entry into the Capitalize sub-system (meaning the CapitalizeUMO).         * -->
+    <!-- *****  - Capitalize.Out    Main exit from the Capitalize sub-system.                                      * -->
+    <!-- *****                                                                                                     * -->
+    <!-- *****  - Reverse.In        Main entry into the Reverse sub-system (meaning the ReverseUMO).               * -->
+    <!-- *****  - Reverse.Out       Main exit from the Reverse sub-system.                                         * -->
+    <!-- *********************************************************************************************************** -->
+    <endpoint name="Entry" address="stdio://System.in" connector-ref="stdioConnector"/>
+    <endpoint name="Exit" address="stdio://System.out" connector-ref="stdioConnector"/>
+    <endpoint name="Error" address="stdio://System.err" connector-ref="stdioConnector"/>
+
+    <endpoint name="Capitalize.In" address="vm://cap.in"/>
+    <endpoint name="Capitalize.Out" address="vm://rev.in"/>
+
+    <endpoint name="Reverse.In" address="vm://rev.in"/>
+    <endpoint name="Reverse.Out" address="file://Reverse/processed"/>
+
+    <!-- ***** Mode: *********************************************************************************************** -->
+    <!-- *****                                                                                                     * -->
+    <!-- *****  - Gate.In       Simple UMO that receives a String argument through Entry and splits the string     * -->
+    <!-- *****                  into multiple message using ' ' (space) as a delimiter. The splitting is impl.     * -->
+    <!-- *****                  as a custom outbound router.                                                       * -->
+    <!-- *****                                                                                                     * -->
+    <!-- *****  - Gate.Out      Simple UMO that aggregates the splittet message, concatenates them and output      * -->
+    <!-- *****                  the resulting message on System.out. A custom aggregator has been written for this * -->
+    <!-- *****                                                                                                     * -->
+    <!-- *****  - CapitalizeUMO A Service that accepts (only) lower-case String values, which it transforms into   * -->
+    <!-- *****                  an upper-case only String. A regexp-filter is used to make sure only lower-case    * -->
+    <!-- *****                  Strings are accepted and forwarded to the service implementation. A rejected       * -->
+    <!-- *****                  message is rejected and caught by a catch-all-strategy that logs it with a prefix. * -->
+    <!-- *****                                                                                                     * -->
+    <!-- *****  - ReverseUMO    A Service that accepts String-messages and returns a reversed version of an        * -->
+    <!-- *****                  incoming String. If a palindrome is received (same value when reversed) an         * -->
+    <!-- *****                  IllegalStateException is thrown, which is caught by the registered Exception-      * -->
+    <!-- *****                  Strategy, which logs it with a prefix.                                             * -->
+    <!-- *********************************************************************************************************** -->
+    <model name="main">
+
+        <service name="Gate.In">
+
+            <inbound>
+                <inbound-endpoint ref="Entry"/>
+            </inbound>
+
+            <bridge-component/>
+
+            <outbound>
+                <custom-outbound-router class="${groupId}.routing.StringSplitterOutboundRouter"
+                                        enableCorrelation="IF_NOT_SET">
+                    <outbound-endpoint ref="Capitalize.In"/>
+                </custom-outbound-router>
+            </outbound>
+
+        </service>
+
+        <service name="Gate.Out">
+
+            <inbound>
+                <inbound-endpoint ref="Reverse.Out"/>
+                <custom-inbound-router class="${groupId}.routing.StringTokenAggregatorRouter"/>
+            </inbound>
+
+            <bridge-component/>
+
+            <outbound>
+                <outbound-pass-through-router>
+                    <outbound-endpoint ref="Exit"/>
+                </outbound-pass-through-router>
+            </outbound>
+
+        </service>
+
+        <service name="CapitalizeUMO">
+
+            <inbound>
+
+                <forwarding-catch-all-strategy>
+                    <outbound-endpoint ref="Error" transformer-refs="RejectedPrefix"/>
+                </forwarding-catch-all-strategy>
+
+                <inbound-endpoint ref="Capitalize.In"/>
+
+                <selective-consumer-router>
+                    <regex-filter pattern="([a-z]+)"/>
+                </selective-consumer-router>
+
+            </inbound>
+
+            <component>
+                <spring-object bean="capitalizeUmo"/>
+            </component>
+
+            <outbound>
+                <outbound-pass-through-router>
+                    <outbound-endpoint ref="Capitalize.Out"/>
+                </outbound-pass-through-router>
+            </outbound>
+
+        </service>
+
+        <service name="ReverseUMO">
+
+            <inbound>
+                <inbound-endpoint ref="Reverse.In" transformer-refs="File2String"/>
+            </inbound>
+
+            <component>
+                <spring-object bean="reverseUmo"/>
+            </component>
+
+            <outbound>
+                <outbound-pass-through-router>
+                    <outbound-endpoint ref="Reverse.Out"/>
+                </outbound-pass-through-router>
+            </outbound>
+
+            <default-service-exception-strategy>
+                <outbound-endpoint ref="Error" transformer-refs="ErrorPrefix"/>
+            </default-service-exception-strategy>
+
+        </service>
+
+    </model>
+
+</mule>

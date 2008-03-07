@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archetype>
+  <id>mule-archetype</id>
+  <allowPartial>true</allowPartial>
+  <sources>
+  	<source>src/main/java/StartServer.java</source>
+    <source>src/main/java/umo/CapitalizeUMO.java</source>
+    <source>src/main/java/umo/ReverseUMO.java</source>
+    <source>src/main/java/routing/StringSplitterOutboundRouter.java</source>
+    <source>src/main/java/routing/StringTokenAggregatorRouter.java</source>
+    <source>src/main/java/transformers/PrefixStringTransformer.java</source>
+  </sources>
+  <!--testSources>
+    <source>src/test/java/CapitalizeUMOTest.java</source>
+    <source>src/test/java/ReverseUMOTest.java</source>
+  </testSources-->
+  <resources>
+  	<resource>src/main/resources/mule-config-spring.xml</resource>
+  	<resource>src/main/resources/mule-config-spring.properties</resource>
+  	<resource>src/main/resources/components-spring.xml</resource>
+    <resource>src/main/resources/log4j.properties</resource>  
+  </resources>
+</archetype>
